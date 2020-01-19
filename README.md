@@ -1,7 +1,6 @@
 # Adaptive Variable Selection
-Adaptive Variable Selection is a strategy for finding and averaging models based on forecasting objectives
+Adaptive Variable Selection is a strategy to find sets of models for specific forecasting objectives, and to average them together for forecasting. You can find our paper on [arxiv](https://arxiv.org/abs/1906.06580v1). Here's the abstract:
 
-You can find our paper here:
 
-https://arxiv.org/abs/1906.06580v1
 
+> We discuss Bayesian model uncertainty analysis and forecasting in sequential dynamic modeling of multivariate time series. The perspective is that of a decision-maker with a specific forecasting objective that guides thinking about relevant models. Based on formal Bayesian decision-theoretic reasoning, we develop a time-adaptive approach to exploring, weighting, combining and selecting models that differ in terms of predictive variables included. The adaptivity allows for changes in the sets of favored models over time, and is guided by the specific forecasting goals. A synthetic example illustrates how decision-guided variable selection differs from traditional Bayesian model uncertainty analysis and standard model averaging. An applied study in one motivating application of long-term macroeconomic forecasting highlights the utility of the new approach in terms of improving predictions as well as its ability to identify and interpret different sets of relevant models over time with respect to specific, defined forecasting goals.
