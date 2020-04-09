@@ -153,7 +153,9 @@ dynamic_linear_model <- function(time, F, y, model = NULL, series_number=NULL, s
     for(t in start_time:time){
       # Apply the discount factors
       
-      # Option of a manual intervention to downweight models before a set time, to adapt quickly at the intervention point
+      # DOING A MANUAL INTERVENTION
+      # discard 50% of the evidence instead of the usual discount factor
+      # THIS MAY HELP IT ADAPT FASTER
       if(intervention == TRUE){
         if(t %in% interventions){
           n = 0.5 * n / delta
@@ -204,6 +206,7 @@ dynamic_linear_model <- function(time, F, y, model = NULL, series_number=NULL, s
 
 
 ### Extract the models into vector form from a string
+# Note that we also convert from the clojure convention of starting at 0, to the R convention starting at 1
 extract_model_dlm <- function(model_string){
   start = str_locate(model_string, pattern = ": ")[2]
   mod = str_sub(model_string, start = start+1)
@@ -215,6 +218,7 @@ extract_model_dlm <- function(model_string){
 dlm_name <- function(model){
   return(paste("Model:", toString(model)))  
 }
+
 
 #### Draw values from a given model
 # Assume that theta, lambda are distributed Normal-Gamma
@@ -230,6 +234,9 @@ model_dist_dlm <- function(time, F, dlm, y=NULL, mean=FALSE){
 }
 
 model_dist <- function(X, dlm, y=NULL, mean=FALSE){
+  #ft = t(X) %*% dlm$m
+  #qt = as.numeric(t(X) %*% dlm$C %*% as.matrix(X)) + dlm$s
+  
   ft = crossprod(X, dlm$m)
   qt = crossprod(X, dlm$C) %*% X  + dlm$s
 

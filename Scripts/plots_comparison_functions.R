@@ -207,7 +207,12 @@ rMSE_marg_combined <- function(plot_data, series_names, scales = "fixed"){
      geom_point(size=2) +
     # scale_colour_discrete("")+
     # scale_linetype_manual("", guide=FALSE)+
-     facet_wrap(~series, nrow=1, scales = scales)
+    if(length(series_names) > 3){
+      facet_wrap(~series, nrow=2, scales = scales)
+    }else{
+      facet_wrap(~series, nrow=1, scales = scales)
+    }
+     
   
   standard_theme(p, ylab = "rMSFE") +
     scale_x_continuous(name = "Forecast Length (Months)", breaks=seq(1,k, by=2)) +
@@ -323,7 +328,7 @@ forecast_multiple_mods <- function(plot_data, series_number, series_names, mods,
   ylims[2] = ylims[2] - (mean - ylims[2])
   
   # forecast_mod_names = paste(str_to_upper(mod), "Forecast", forecast_length, "Months Ahead", sep=" ")
-  forecast_mod_names = paste(str_to_upper(mod), "Forecast", sep=" ")
+  forecast_mod_names = map(mods, function(mod) paste(str_to_upper(mod), "Forecast", sep=" "))
   
   plot_data = plot_data %>%
     filter(series == series_number & k == forecast_length & model %in% mods) %>%

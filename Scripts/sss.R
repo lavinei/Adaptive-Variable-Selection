@@ -119,20 +119,3 @@ to_dataframe <- function(list){
              "SSS_action" = )
 }
 
-#objective <- function(set){
-#  total = 0
-#  if(cset_contains_element(set,1)) total=total + 0.3
-#  if(cset_contains_element(set,2)) total=total - 0.1
-#  if(cset_contains_element(set,3)) total=total + 0.6
-#  if(cset_contains_element(set,4)) total=total - 0.5
-#  pnorm(total, 0, 1)
-#}
-
-#constraint <- function(set){
-#  if(cset_contains_element(set,1) & cset_contains_element(set,2)){
-#     TRUE
-#   }else{
-#     FALSE
-#   }
-# }
-

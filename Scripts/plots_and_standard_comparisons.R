@@ -9,14 +9,14 @@ library(gridExtra)
 library(dplyr)
 library(tidyverse)
 
-basepath = "~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/Adaptive-Variable-Selection/"
+basepath = "~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/github_scripts/"
 
 setwd(basepath)
 source("./Scripts/plots_comparison_functions.R")
 
-training_period = 36 #30 for the simulation, 36 for macroeconomic example
+training_period = 60
 
-filename = "t_plus_k_density_ar_higherdim"
+filename = "t_plus_k_density_ar_newobj_forecast24"
 
 imgfolder = paste0(basepath, "Images/", filename)
 
@@ -85,13 +85,22 @@ plot_data = bind_rows(plot_bma, plot_avs)
 p = rMSE_marg_combined(plot_data, names, scales="free_y") + scale_x_continuous(name = "Forecast Length", breaks = seq(1, k, by=2))
 make_jpg(p, paste(filename, "marginal_rMSE_combined", sep="_"))
 
+# Plot the marginal percent error
+# plot_data = bind_rows(plot_bma, plot_avs)
+# p = perc_error_marg_combined(plot_data, names) + scale_x_continuous(name = "Forecast Length")
+# make_jpg(p, paste(filename, "marginal_perc_err_combined", sep="_"))
+
 # Plot the objective fxn relative to AVS over time
 kdens_data = get_kdens_comparison_data(list(kdens_avs, kdens_bma))
+
+# p = LPDR_logitudinal_relative(kdens_data) + scale_x_continuous("Time", breaks = tticks, labels = tdates) + scale_y_continuous(name = "log density of k-step forecast relative to AVS", limits=c(-100, 0))
+# make_jpg(p, paste(filename, "k_step_path_density_comparison_relative", sep="_"))
 
 # Plot the objective fxn over time
 p = LPDR_logitudinal(kdens_data) + 
   scale_x_continuous("Time", breaks = tticks, labels = tdates) + 
   scale_y_continuous(name = "log density of k-step forecast")#, limits=c(-100, 0))
+
 make_jpg(p, paste(filename, "k_step_path_density_comparison", sep="_"))
 
 
@@ -105,7 +114,9 @@ kdens_data_cumsum = kdens_data %>% spread(key = "model", value = "k_step_path_de
   transmute(time = time,
             bma = cumsum(bma)) %>%
   gather("model", "LPDR", 2)
-p = LPDR(kdens_data_cumsum) + scale_x_continuous("Time", breaks = tticks, labels = tdates)
+p = LPDR(kdens_data_cumsum) + 
+  scale_x_continuous("Time", breaks = tticks, labels = tdates) + 
+  scale_y_continuous(name = "log density of k-step forecast \n relative to AVS")
 make_jpg(p, paste(filename, "k_step_path_density_comparison_cumulative", sep="_"))
 
 # Variable inclusion plots - avs
@@ -155,13 +166,13 @@ make_jpg(plot_list[[1]], paste(filename, "bma_model", sep="_"))
 
 # Forecast plots
 # Multiple lengths at the same time - avs
-plot_list = lapply(1:3, function(i) forecast_multiple_lengths(plot_data, series_number = i, names, mod = "avs", forecast_lengths = c(1, 12)))
+plot_list = lapply(1:num_series, function(i) forecast_multiple_lengths(plot_data, series_number = i, names, mod = "avs", forecast_lengths = c(1, 12)))
 walk2(plot_list, names, function(p, n) make_jpg(p, paste(filename, "AVS_forecast_k1_k12", n, sep="_")))
 
 # Multiple lengths at the same time - bma
-plot_list = lapply(1:3, function(i) forecast_multiple_lengths(plot_data, series_number = i, names, mod = "bma", forecast_lengths = c(1, 12)))
+plot_list = lapply(1:num_series, function(i) forecast_multiple_lengths(plot_data, series_number = i, names, mod = "bma", forecast_lengths = c(1, 12)))
 walk2(plot_list, names, function(p, n) make_jpg(p, paste(filename, "BMA_forecast_k1_k12", n, sep="_")))
 
 # Comparing AVS and BMA forecasts
-plot_list = lapply(1:3, function(i) forecast_multiple_mods(plot_data, i, names, mods = c("avs", "bma"), forecast_length = 12))
+plot_list = lapply(1:num_series, function(i) forecast_multiple_mods(plot_data, i, names, mods = c("avs", "bma"), forecast_length = 12))
 walk2(plot_list, names, function(p, n) make_jpg(p, paste(filename, "AVS_BMA_forecast_k12", n, sep="_")))

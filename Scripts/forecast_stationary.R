@@ -1,12 +1,10 @@
+### Re-writing forecasting functions to include a stationarity constraint
+### Or more specifically, a stability constrain
+
 ### Forecasting Simulation method (for each Monte Carlo draw):
 ### 1. Choose a DDNM, represented by 1 model for each univariate series
 ### 2. For each series, simulate the state vector k-steps ahead. At each step, jointly test for stationarity, and reject non-stationary samples.
 ### 3. Jointly simulate k-steps ahead, conditioned on the simulated state vectors
-
-# Functions:
-# 1. is_stationary - test for joint stationarity of the vector auto regression
-# 2. simulate_MC_path - chooses a DDNM, and starts the process
-# 3. Simulate path - simulates the states, while testing for stationarity, and then simulates the forecasts
 
 # model_names_list and model_probs_list should be a list of length = num_series
 # Each entry in the list should be another list of models
@@ -153,6 +151,45 @@ update_X_list_ar <- function(X_list, sim_pts, i, data_list, series_number, num_s
   X_list
 }
 
+update_X_list_ar_chooselags <- function(X_list, sim_pts, i, data_list, series_number, num_series, lags=c()){
+
+  # Start with the true future predictor values
+  if(series_number > 1){
+    X_list[[series_number-1]] = data_list[[series_number-1]][time+i,]
+
+    # Fill in the contemporaneous simulated values
+    X_list[[series_number-1]][2:(2 + num_series - series_number)] = sim_pts[i,series_number:num_series]
+
+    # Fill in the other simulated values
+    for(z in 1:length(lags)){
+      l = lags[z]
+      if(l < i){
+        spot = 3 + num_series*z - series_number
+        X_list[[series_number-1]][spot:(spot + num_series - 1)] = sim_pts[i - l,]
+      }
+    }
+
+  }else if(series_number == 1){
+    X_list[[num_series]] = data_list[[num_series]][time+i+1,]
+    
+    # Fill in the other simulated values
+    for(z in 1:length(lags)){
+      l = lags[z]
+      if(l < (i+1)){
+        spot = 2 + num_series*(z-1)
+        X_list[[num_series]][spot:(spot + num_series - 1)] = sim_pts[i - l + 1,]
+      }
+    }
+  }
+
+
+
+
+
+  X_list
+}
+
+
 update_X_list <- function(X_list, sim_pts, i, data_list, series_number, num_series){
   # Get the next X values
   if(series_number > 1){
@@ -189,7 +226,11 @@ simulate_path_generator <- function(score_fxn, initialize_dlm_list, update_dlm_l
     X_list[[num_series]] = data_list[[num_series]][time+1, ]
     
     # First, analyze the objective function applied into the future (must be analytic)
-    objective = vapply(1:num_series, function(i) score_fxn(dlm_list[[i]], k, i, time+k, environments[[i]]$X_full, environments[[i]]$y_full), numeric(1))
+    
+
+    # objective = vapply(1:num_series, function(i) score_fxn(dlm_list[[i]], k, i, time+k, environments[[i]]$X_full, environments[[i]]$y_full), numeric(1))
+    # Joint k-step density objective:
+    objective = c()
     
     # Second, forecast into the future through simulation
     
@@ -201,6 +242,21 @@ simulate_path_generator <- function(score_fxn, initialize_dlm_list, update_dlm_l
       
       # Simulate the observations
       for(series_number in num_series:1){
+        
+        ### Joint t+k density, for horizon-specific forecasting
+        if(i == k){
+          # Create copies of the predictor matrix and simulated points
+          # on this round, need to fill in the true values
+          if(series_number == num_series){
+            X_list_dens = X_list
+            sim_pts_dens = sim_pts
+          }
+          
+          objective = c(objective, log(model_dist(X_list_dens[[series_number]][dlm_list[[series_number]]$model], dlm_list[[series_number]], y = observations_list[[series_number]][time+k])))
+          
+          sim_pts_dens[i, series_number] = observations_list[[series_number]][time+k]
+          X_list_dens = update_X_list(X_list_dens, sim_pts_dens, i, data_list, series_number, num_series)
+        }
         
         # Simulate a new point in the path
         sim_pts[i, series_number] = simulate_pt(X_list[[series_number]], dlm_list[[series_number]])

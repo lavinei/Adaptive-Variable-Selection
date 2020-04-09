@@ -1,5 +1,5 @@
 
-setwd("~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/Adaptive-Variable-Selection/")
+setwd("~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/github_scripts/")
 
 is_bma = TRUE
 simulation = FALSE # If false, running the macroeconomic example
@@ -9,6 +9,7 @@ source("./Scripts/initialize_forecast.R")
 bma = list()
 
 
+# Setting up data for BMA analysis
 for (series_number in 1:num_series){
   if(series_number == 1){
     environments[[series_number]]$bmadata = data.frame(environments[[series_number]]$y_full,
@@ -22,14 +23,13 @@ for (series_number in 1:num_series){
   
 }
 
+# Starting analysis loop
 for (t in 1:timesteps){
   
   start = Sys.time()
   # For t in 1:T
-  #   for each series:
-  #     - Select n models with BMA. Discount / put less weight on older observations.
+  #     - Select n univariate models for each series with BMA. Use a discount factor (aka forgetting factor) to put less weight on older observations.
   #     - Forecast forwards k steps (select 1 model for each series, combine into a DDNM, and forecast)
-  #     - Use forward filtering to get the DLM model coefficients
 
   # Select n models with BMA
   for (series_number in 1:num_series){
@@ -41,6 +41,7 @@ for (t in 1:timesteps){
       probs = as.vector(bma[[series_number]], mode="numeric")
       bma[[series_number]] = list(which = models, postprobs = probs, probne0=rep(1/length(environments[[series_number]]$Omega), length(environments[[series_number]]$Omega)))
     }else{
+      # Using the package BAS to find many models to average over
       n = time
       bma[[series_number]] = bas.lm(Y ~ ., data=environments[[series_number]]$bmadata[1:n,], weights = beta^((n-1):0), n.models=100000, method="MCMC", renormalize = FALSE,
                                      modelprior=tr.beta.binomial(1,1,maxmodel_vec[series_number]-1), prior='g-prior', alpha=n)
@@ -70,23 +71,24 @@ for (t in 1:timesteps){
   }else if(!parallel){
     forecast_list = lapply(1:forecast_samps, function(z) simulate_path_MC(model_list, model_probs_list, k = forecast_length, data_list = data_list, observations_list, ncol, store_predictor_matrix))
   }
+  
+  # Extract forecast simulations and the forecast score, for comparison with AVS
   forecast_sample = sapply(forecast_list, function(x) x[[1]], simplify="array")
   k_step_density = log(mean(exp(sapply(forecast_list, function(x) x[[2]], simplify="array"))))
 
   print(k_step_density)
   k_step_density_store = c(k_step_density_store, k_step_density)
 
-  cred_int = apply(forecast_sample, c(1, 2), function(x) quantile(x, quantiles))  
   
-  # Get the Monte Carlo mean
+  # Get the Monte Carlo mean and credible interval
+  cred_int = apply(forecast_sample, c(1, 2), function(x) quantile(x, quantiles))  
   mean = apply(forecast_sample, c(1, 2), function(x) mean(x))
   
-
   if(parallel){
     clusterExport(cl, varlist=c("environments"))
   }
   
-  # Now advance one timestep, and add in data
+  # Now advance one timestep, and add in the new observation
   time = time + 1
   for(series_number in num_series:1){
     environments[[series_number]]$data = matrix(environments[[series_number]]$X_full[1:time,], nrow=time)
@@ -104,7 +106,7 @@ for (t in 1:timesteps){
   # Save the forecast samples
   forecast_sample_store = abind(forecast_sample_store, array(forecast_sample, dim=c(dim(forecast_sample), 1)))
   
-  # Save the "chosen" model as the posterior mode from BMA, for comparison with AVS
+  # Save the posterior modal model as the "chosen" model from BMA, for comparison with AVS
   for(series_number in 1:num_series){
     environments[[series_number]]$model_store = c(environments[[series_number]]$model_store, list(bma[[series_number]]$which[[which.max(bma[[series_number]]$postprobs)]] + 1))
   }
@@ -120,6 +122,8 @@ if(parallel){
   stopCluster(cl)
   gc()
 }
+
+######## Save data from an analysis ##########
 
 quantile_names = c("lower", "cred_25", "prediction", "cred_75", "upper")
 dimnames(cred_int_store) = list("quantile" = quantile_names, "k" = 1:forecast_length, "series" = 1:num_series, "time" = 1:time)

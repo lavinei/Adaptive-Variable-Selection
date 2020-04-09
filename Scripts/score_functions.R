@@ -31,6 +31,62 @@ lpfds_analytic <- function(dlm, k = 12, series_to_eval, time, data, y){
   # Log density of the k-step ahead path
   return(dmvt(y[(time-k+1):time], mu,  sigma, dof, log = TRUE))
 }
+# 
+# lpfds_ar <- function(dlm, k = 12, series_to_eval, time, data, y){
+#   
+#   index = seq(num_series + 1, by = num_series, length = ifelse(choose_lags, length(lags), k))
+#   var = vector("numeric", length = k)
+#   mu = vector("numeric", length = k)
+#   dof = vector("numeric", length = k)
+#   sim_pts = vector("numeric", length = k)
+#   X = matrix(data[(time-k+1):time, dlm$model], ncol=length(dlm$model))
+#   dlm$W = (1-delta)/delta * dlm$C
+#   score = 0
+#   
+#   for(i in 1:k){
+#     # R(i) is the variance of the coefficients at time t+i
+#     R_i = dlm$C + i * dlm$W
+#     
+#     # Mean and variance for observation y_(t+i)
+#     X = data[time - k + i, dlm$model]
+#     mu[i] = crossprod(X, dlm$m)
+#     var[i] = crossprod(X, R_i) %*% X  + dlm$s
+#     dof[i] = beta^i * dlm$n
+#     
+#     score = score + log(model_dist(X = X, dlm=dlm, y = y[time - k + i]))
+#     
+#     sim_pts[i] = mu[i] + sqrt(var[i]) * rt(1, df = dof[i])
+#     if(i < k){
+#       
+#       if(choose_lags){
+#         ls = lags[lags<=i]
+#         data[time - k + i + 1, index[1:length(ls)]] = sim_pts[i - ls + 1]
+#       }else{
+#         data[time - k + i + 1, index[1:i]] = sim_pts[i:1]
+#       }
+#       
+#       y[time - k + i] = sim_pts[i]
+#       
+#     }
+#     
+#   }
+#   
+#   # Log density of the k-step ahead path
+#   return(score)
+# }
+# 
+# lpfds_ar_wrapper <- function(dlm, k = 12, series_to_eval, time, data, y, nsamps = 50){
+#   
+#   # Check if the model actually has an AR component, before resorting to the ar function, which is slower
+#   index = seq(num_series + 1, by = num_series, length = ifelse(choose_lags, length(lags), k))
+#   if(any(dlm$model %in% index)){
+#     mean(vapply(1:nsamps, function(z) lpfds_ar(dlm, k = k, series_to_eval, time, data, y), numeric(1)))
+#   }else{
+#     lpfds_analytic(dlm, k = k, series_to_eval, time, data, y)
+#   }
+#   
+# }
+
 
 
 t_plus_k_density <- function(dlm, k = 12, series_to_eval, time, data, y){
@@ -103,7 +159,7 @@ t_plus_k_density_ar_wrapper <- function(dlm, k = 12, series_to_eval, time, data,
   
 }
 
-# This version is the rao-blackwellized version of the k-step forecast density, for speed
+# In this version, I'm trying out the rao-blackwellized version of the k-step forecast, for speed (no stationarity requirement here)
 t_plus_kvec_density_ar_generator <- function(kvec){
   function(dlm, k = 12, series_to_eval, time, data, y){
     

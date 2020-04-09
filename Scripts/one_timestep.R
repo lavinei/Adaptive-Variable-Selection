@@ -1,4 +1,5 @@
-### This is the main function for running the simulations
+### This script runs one timestep of an AVS analysis
+
 ############################################## SET UP ENVIRONMENTAL VARIABLES ##############################################
 walk(environments, function(e) e$simulated_array = array(NA, dim = c(time + k, ncol(e$X_full), nsamps)))
 walk(environments, function(e) e$sim_count = 1)
@@ -22,10 +23,9 @@ if(time %% sss_frequency == 0){
     
     environments[[series_number]]$sss_output = sss(objective, constraint, cset(environments[[series_number]]$dlm$model), environments[[series_number]]$Omega, niter)
     
-    #   Extracting the list of models, and the vector of log-probabilities
+    #   Extracting the list of models, and the vector of model scores
     environments[[series_number]]$model_names = names(environments[[series_number]]$sss_output)
     environments[[series_number]]$models = lapply(names(environments[[series_number]]$sss_output), extract_model_dlm)
-    #environments[[series_number]]$probs = as.vector(environments[[series_number]]$sss_output, mode="numeric") #Not actually the probs yet
     environments[[series_number]]$s_z = as.vector(environments[[series_number]]$sss_output, mode="numeric")
     
     # Now saving all of these models to the leaderboard and removing any models that are entered twice
@@ -36,6 +36,7 @@ if(time %% sss_frequency == 0){
       distinct %>% # Removing duplicate rows
       arrange(desc(time), desc(score)) #Arranging in descending order by time and then model score
     
+    # For each model under consideration, defining the appropriate DLM and updating to the current time point
     for(model in environments[[series_number]]$models){
       environments[[series_number]]$model_list[[paste("Model:", toString(model))]] = dynamic_linear_model(time = time, F = environments[[series_number]]$data,
                                                                                                           y = environments[[series_number]]$y,
@@ -46,7 +47,7 @@ if(time %% sss_frequency == 0){
                                                                                                           beta = beta)
     }
     
-    # Re-updating the chosen model by pulling it from the model list
+    # Pulling out the current representative model
     environments[[series_number]]$dlm = environments[[series_number]]$model_list[[paste("Model:",toString(environments[[series_number]]$dlm$model))]]
   }
   
@@ -57,7 +58,7 @@ sss_end = Sys.time()
 sss_runtime_store = c(sss_runtime_store, difftime(sss_end, sss_start, units="mins"))
 
 
-############################################## DEFINE THE PRIOR ####################################################
+############################################## DEFINE THE PRIOR OVER MODELS ####################################################
 walk(environments, function(e) e$nmod = length(e$model_names))
 if(prior_type == "uniform"){
   walk(environments, function(e) e$prior = rep(1, e$nmod))
@@ -68,11 +69,16 @@ if(prior_type == "uniform"){
   walk(environments, function(e) e$prior[e$current_model] = 0.5)
 }
 
+# Rescale model scores relative to the current representative model
 walk(environments, function(e) e$s_z0 = e$s_z[e$current_model])
+
+# Define the Gibbs model likelihoods (based on the model scores)
 walk(environments, function(e) e$probs = exp(tau*(rescale_probs(e$s_z))))
+
+# Define the Gibbs model probabilities
 walk(environments, function(e) e$model_probs = (e$prior * e$probs) / sum(e$prior * e$probs))
 
-############################################## SIMULATE FORWARD WITH BMA ##############################################
+############################################## FORECAST VIA MODEL AVERAGING  ##############################################
 model_names_list = list()
 model_probs_list = list()
 for(s in 1:num_series){
@@ -94,7 +100,7 @@ if(parallel){
 
 forecast_sample = sapply(forecast_list, function(x) x[[1]], simplify="array")
 
-# Monte carlo average is taken on the real scale, not the log scale
+# Extract the forecast score (i.e. the path forecast density, or k-step forecast density)
 k_step_density = log(mean(exp(sapply(forecast_list, function(x) x[[2]], simplify="array"))))
 
 # Log the forecasting runtime
@@ -104,7 +110,6 @@ forecast_runtime_store = c(forecast_runtime_store, difftime(forecast_end, foreca
 # Get the Monte Carlo credible intervals and means
 cred_int = apply(forecast_sample, c(1, 2), function(x) quantile(x, quantiles))  
 mean = apply(forecast_sample, c(1, 2), function(x) mean(x))  
-
 
 ############################################## OBSERVE TIME t RESPONSE, UPDATE MODEL PROBABILITIES ##############################################
 # Add the next time point onto the series (data is stored in X_full) - need to tack it on to the end of the series
@@ -183,7 +188,7 @@ for(series_number in 1:num_series){
   
 }
 
-############################################## SELECT NEXT CHOSEN MODEL Z ##############################################
+############################################## SELECT NEXT REPRESENTATIVE MODEL ##############################################
 select_start = Sys.time()
 if(select_z == "postmode"){
   for(series_number in 1:num_series){
@@ -207,13 +212,6 @@ if(select_z == "postmode"){
   for(series_number in 1:num_series){
     
     # Calculate the KL-divergence between all individual predictive model densities and the BMA predictions
-    
-    # Right now this is done one series at a time
-    # Since forecasts are made jointly, across all series, this is done by:
-    # Looking at each of the simulated futures in TURN
-    # Conditioning on the other series, and then getting the LPFD score for each model
-    # And then averaging the LPFD scores for each model across all possible simulated futures
-    # Since this is a lot of computation, only doing 10 MC samples per model & simulated future combination
     if(parallel){
       clusterExport(cl, varlist=c("series_number"))
       environments[[series_number]]$densities = parSapply(cl, environments[[series_number]]$model_names, function(model_name) KL_indep(nsamps, environments[[series_number]]$model_list[[model_name]]$m, environments[[series_number]]$model_list[[model_name]]$C,
@@ -228,11 +226,6 @@ if(select_z == "postmode"){
     }
     
     # Choose the model with the minimum KL-divergence from the BMA mixture
-    # I could go ahead and work out the density of each of these simulated paths under the BMA mixture
-    # And the density of each path under the individual models
-    # And then choose the model with the minimum KL-divergence
-    # But that is equivalent to choosing the model with the highest likelihood for these points
-
     chosen_model = which.max(environments[[series_number]]$densities)
     environments[[series_number]]$model = environments[[series_number]]$models[chosen_model]
     environments[[series_number]]$dlm = environments[[series_number]]$model_list[[environments[[series_number]]$model_names[chosen_model]]]
@@ -242,6 +235,5 @@ if(select_z == "postmode"){
 }
 
 ######################################
-
 select_end = Sys.time()
 select_runtime_store = c(select_runtime_store, difftime(select_end, select_start, units="mins"))

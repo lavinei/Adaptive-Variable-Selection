@@ -1,5 +1,5 @@
 # Running adaptive variable selection with a DDNM
-setwd("~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/Adaptive-Variable-Selection/")
+setwd("~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/github_scripts/")
 
 is_bma = FALSE
 simulation = FALSE # If false, running the macroeconomic example
@@ -57,7 +57,7 @@ print(sum(sss_runtime_store)/60)
 print(sum(forecast_runtime_store)/60)
 print(sum(select_runtime_store)/60)
 
-######## Save data ##########
+######## Save data from an analysis ##########
 
 quantile_names = c("lower", "cred_25", "prediction", "cred_75", "upper")
 dimnames(cred_int_store) = list("quantile" = quantile_names, "k" = 1:forecast_length, "series" = 1:num_series, "time" = 1:time)
