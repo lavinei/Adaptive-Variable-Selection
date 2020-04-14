@@ -9,14 +9,14 @@ library(gridExtra)
 library(dplyr)
 library(tidyverse)
 
-basepath = "~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/github_scripts/"
+basepath = "~/Homework/SAMSI Bays Opt/Paper Modeling/Scripts/Adaptive-Variable-Selection/"
 
 setwd(basepath)
 source("./Scripts/plots_comparison_functions.R")
 
 training_period = 60
 
-filename = "t_plus_k_density_ar_newobj_forecast24"
+filename = "lpfds"
 
 imgfolder = paste0(basepath, "Images/", filename)
 
@@ -82,7 +82,7 @@ setwd(imgfolder)
 
 # Plot the marginal rMSE
 plot_data = bind_rows(plot_bma, plot_avs)
-p = rMSE_marg_combined(plot_data, names, scales="free_y") + scale_x_continuous(name = "Forecast Length", breaks = seq(1, k, by=2))
+p = rMSE_marg_combined(plot_data, names, scales="free_y") + scale_x_continuous(name = "Horizon", breaks = seq(4, k, by=4))
 make_jpg(p, paste(filename, "marginal_rMSE_combined", sep="_"))
 
 # Plot the marginal percent error
